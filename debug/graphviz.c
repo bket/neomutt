@@ -49,11 +49,11 @@
 #include "notmuch/private.h"
 #include "pop/private.h"
 
-// #define GV_HIDE_CONTEXT
+#define GV_HIDE_CONTEXT
 #define GV_HIDE_CONTEXT_CONTENTS
 // #define GV_HIDE_MBOX
-// #define GV_HIDE_NEOMUTT
-// #define GV_HIDE_CONFIG
+#define GV_HIDE_NEOMUTT
+#define GV_HIDE_CONFIG
 // #define GV_HIDE_MDATA
 
 static void dot_email(FILE *fp, struct Email *e, struct ListHead *links);
@@ -405,6 +405,7 @@ static void dot_path_imap(char *buf, size_t buflen, const char *path)
   url_free(&u);
 }
 
+#ifndef GV_HIDE_CONFIG
 static void dot_config(FILE *fp, const char *name, int type,
                        struct ConfigSubset *sub, struct ListHead *links)
 {
@@ -460,6 +461,7 @@ static void dot_config(FILE *fp, const char *name, int type,
   dot_object_footer(fp);
   mutt_buffer_dealloc(&value);
 }
+#endif
 
 static void dot_comp(FILE *fp, struct CompressInfo *ci, struct ListHead *links)
 {
@@ -917,6 +919,7 @@ static void dot_account_list(FILE *fp, struct AccountList *al, struct ListHead *
   }
 }
 
+#ifndef GV_HIDE_CONTEXT
 static void dot_context(FILE *fp, struct Context *ctx, struct ListHead *links)
 {
   dot_object_header(fp, ctx, "Context", "#ff80ff");
@@ -928,6 +931,7 @@ static void dot_context(FILE *fp, struct Context *ctx, struct ListHead *links)
 #endif
   dot_object_footer(fp);
 }
+#endif
 
 void dump_graphviz(const char *title)
 {
@@ -1295,7 +1299,10 @@ static void dot_email(FILE *fp, struct Email *e, struct ListHead *links)
 
   dot_object_header(fp, e, "Email", "#ff80ff");
 
-  dot_type_string(fp, "path", e->path, true);
+  // dot_type_string(fp, "path", e->path, true);
+
+  dot_path_fs(arr, sizeof(arr), e->path);
+  dot_type_string(fp, "path", arr, true);
 
 #define ADD_BOOL(F) add_flag(&buf, e->F, #F)
   ADD_BOOL(active);
@@ -1355,7 +1362,8 @@ static void dot_email(FILE *fp, struct Email *e, struct ListHead *links)
   dot_type_number(fp, "attach_total", e->attach_total);
 
   struct MaildirEmailData *edata = maildir_edata_get(e);
-  dot_type_string(fp, "maildir_flags", edata->maildir_flags, false);
+  if (edata)
+    dot_type_string(fp, "maildir_flags", edata->maildir_flags, false);
 
   if (e->date_sent != 0)
   {
@@ -1405,13 +1413,17 @@ static void dot_email(FILE *fp, struct Email *e, struct ListHead *links)
   mutt_buffer_dealloc(&buf);
 }
 
-void dump_graphviz_email(struct Email *e)
+void dump_graphviz_email(struct Email *e, int num)
 {
+  if (!e)
+    return;
+
   char name[256] = { 0 };
   struct ListHead links = STAILQ_HEAD_INITIALIZER(links);
 
   time_t now = time(NULL);
-  mutt_date_localtime_format(name, sizeof(name), "%R.gv", now);
+  snprintf(name, sizeof(name), "%03d-", num);
+  mutt_date_localtime_format(name + 4, sizeof(name) - 4, "%R.gv", now);
 
   umask(022);
   FILE *fp = fopen(name, "w");

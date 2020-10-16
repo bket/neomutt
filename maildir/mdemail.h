@@ -34,6 +34,7 @@ struct MdEmail
   struct Email *email;
   char *canon_fname;
   bool header_parsed : 1;
+  bool old : 1;
 };
 ARRAY_HEAD(MdEmailArray, struct MdEmail *);
 

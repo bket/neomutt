@@ -518,7 +518,6 @@ int maildir_parse_dir(struct Mailbox *m, struct MdEmailArray *mda,
     if (*de->d_name == '.')
       continue;
 
-    /* FOO - really ignore the return value? */
     mutt_debug(LL_DEBUG2, "queueing %s\n", de->d_name);
 
     e = email_new();
@@ -602,7 +601,7 @@ void maildir_delayed_parsing(struct Mailbox *m, struct MdEmailArray *mda,
       rc = stat(fn, &lastchanged);
     }
 
-    const char *key = md->email->path + 3;
+    const char *key = strrchr(md->email->path, '/');
     size_t keylen = maildir_hcache_keylen(key);
     struct HCacheEntry hce = mutt_hcache_fetch(hc, key, keylen, 0);
 
@@ -801,24 +800,24 @@ void maildir_parse_flags(struct Email *e, const char *path)
     {
       switch (*p)
       {
-        case 'F':
+        case 'F': // Flagged
           e->flagged = true;
           break;
 
-        case 'R': /* replied */
+        case 'R': // Replied
           e->replied = true;
           break;
 
-        case 'S': /* seen */
+        case 'S': // Seen
           e->read = true;
           break;
 
-        case 'T': /* trashed */
-          if (!e->flagged || !C_FlagSafe)
-          {
-            e->trash = true;
-            e->deleted = true;
-          }
+        case 'T': // Trashed
+          if (e->flagged && C_FlagSafe)
+            break;
+
+          e->trash = true;
+          e->deleted = true;
           break;
 
         default:
@@ -851,11 +850,7 @@ struct Email *maildir_parse_stream(enum MailboxType type, FILE *fp,
                                    const char *fname, bool is_old, struct Email *e)
 {
   if (!e)
-  {
     e = email_new();
-    e->edata = maildir_edata_new();
-    e->edata_free = maildir_edata_free;
-  }
   e->env = mutt_rfc822_read_header(fp, e, false, false);
 
   struct stat st;
@@ -1094,6 +1089,9 @@ static int maildir_mbox_open(struct Mailbox *m)
    * of the main folder path from which to read messages */
   if ((maildir_read_dir(m, "new") == -1) || (maildir_read_dir(m, "cur") == -1))
     return -1;
+
+  struct EventMailbox ev_m = { m };
+  notify_send(m->notify, NT_MAILBOX, NT_MAILBOX_POPULATE, &ev_m);
 
   return 0;
 }

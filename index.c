@@ -3884,6 +3884,7 @@ int mutt_index_menu(struct MuttWindow *dlg)
         if (cur.e->attach_del)
           Context->mailbox->changed = true;
         menu->redraw = REDRAW_FULL;
+        dump_graphviz_email(cur.e, 0);
         break;
 
       case OP_END_COND:

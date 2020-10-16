@@ -33,6 +33,7 @@ struct Email;
 struct MaildirEmailData
 {
   char *maildir_flags; ///< Unknown Maildir flags
+  char *canon_fname;   ///< Canonical filename (no path, no flags)
 };
 
 void                     maildir_edata_free(void **ptr);

@@ -48,6 +48,8 @@
 struct ConfigSet;
 struct Email;
 struct HeaderCache;
+struct MdEmailArray;
+struct Progress;
 
 extern bool C_MaildirTrash;
 
@@ -55,6 +57,7 @@ extern struct MxOps MxMaildirOps;
 extern struct MxOps MxMhOps;
 
 int           maildir_check_empty      (const char *path);
+void          maildir_delayed_parsing  (struct Mailbox *m, struct MdEmailArray *mda, struct Progress *progress);
 void          maildir_gen_flags        (char *dest, size_t destlen, struct Email *e);
 int           maildir_msg_open_new     (struct Mailbox *m, struct Message *msg, const struct Email *e);
 FILE *        maildir_open_find_message(const char *folder, const char *msg, char **newname);
