@@ -1,12 +1,14 @@
 // gcc -I. -o p{,.c} lib{debug,maildir,hcache,compress,store,core,config,email,address,mutt}.a -lpcre2-8 -lidn2 -ltokyocabinet -lrocksdb -ltdb -llmdb -lkyotocabinet -lgdbm -lqdbm -ldb-5.3 -llz4 -lz -lzstd
 
 #include "config.h"
+#include <ctype.h>
 #include <dirent.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include "mutt/lib.h"
+#include "config/lib.h"
 #include "email/lib.h"
 #include "core/lib.h"
 #include "debug/lib.h"
@@ -21,6 +23,8 @@
 #include "hcache/lib.h"
 #endif
 
+struct MuttWindow;
+
 bool C_Autocrypt = false;
 bool C_FlagSafe = false;
 bool C_MailCheckRecent = false;
@@ -28,17 +32,11 @@ char *HomeDir = NULL;
 bool MonitorContextChanged = false;
 char *ShortHostname = NULL;
 SIG_ATOMIC_VOLATILE_T SigInt = 0;
-struct Context *Context = NULL;
-
-// Flags for maildir_mbox_check()
-#define MMC_NO_DIRS 0        ///< No directories changed
-#define MMC_NEW_DIR (1 << 0) ///< 'new' directory changed
-#define MMC_CUR_DIR (1 << 1) ///< 'cur' directory changed
-
-#define mutt_set_flag(m, e, flag, bf) mutt_set_flag_update(m, e, flag, bf, true)
 
 const struct Mapping Fields[] = { 0 };
 const struct Mapping ComposeFields[] = { 0 };
+
+#define DIVIDER "--------------------------------------------------------------------------------\n"
 
 int nm_update_filename(struct Mailbox *m, const char *old_file, const char *new_file, struct Email *e)
 {
@@ -216,7 +214,7 @@ static int scan_dir(struct MdEmailArray *mda, const char *dir, struct Progress *
   return count;
 }
 
-int mbox_observer(struct NotifyCallback *nc)
+static int mbox_observer(struct NotifyCallback *nc)
 {
   if (!nc)
     return -1;
@@ -225,39 +223,16 @@ int mbox_observer(struct NotifyCallback *nc)
   return 0;
 }
 
-int main(int argc, char *argv[])
+static void my_mbox_open(struct Mailbox *m)
 {
-  MuttLogger = log_disp_terminal;
-  const char *dir = "/home/mail/linode/neo";
-
-  C_HeaderCache = "/home/mutt/.cache/mutt/";
-  C_HeaderCacheBackend = "lmdb";
-  C_Charset = "utf-8";
-
-  if (argc == 2)
-    dir = argv[1];
-
-  struct ConfigSet *cs = cs_new(1024);
-  NeoMutt = neomutt_new(cs);
-  struct Account *a = account_new(NULL, NeoMutt->sub);
-  neomutt_account_add(NeoMutt, a);
-
-  printf("reading: %s\n", dir);
+  printf("reading: %s\n", mailbox_path(m));
   struct Progress progress = { 0 };
   mutt_progress_init(&progress, "Maildir", MUTT_PROGRESS_READ, 0);
-#if 0
-  struct Mailbox *m = mailbox_new();
-  m->type = MUTT_MAILDIR;
-  m->verbose = true;
-  notify_observer_add(m->notify, NT_MAILBOX, mbox_observer, NULL);
-
-  mutt_buffer_strcpy(&m->pathbuf, dir);
-#endif
 
   struct Buffer *buf = mutt_buffer_pool_get();
   struct MdEmailArray mda = ARRAY_HEAD_INITIALIZER;
 
-  mutt_buffer_printf(buf, "%s/cur", dir);
+  mutt_buffer_printf(buf, "%s/cur", mailbox_path(m));
 
   int cur_count = scan_dir(&mda, mutt_b2s(buf), &progress);
   // printf("count = %d\n", cur_count);
@@ -284,7 +259,7 @@ int main(int argc, char *argv[])
     // printf("    %s\n", e->path);
   }
 
-  mutt_buffer_printf(buf, "%s/new", dir);
+  mutt_buffer_printf(buf, "%s/new", mailbox_path(m));
 
   // int new_count =
   scan_dir(&mda, mutt_b2s(buf), &progress);
@@ -309,50 +284,51 @@ int main(int argc, char *argv[])
     // printf("    %s\n", e->path);
   }
 
-  struct Mailbox *m = mailbox_new();
-  mutt_buffer_strcpy(&m->pathbuf, dir);
-  m->realpath = mutt_buffer_strdup(&m->pathbuf);
-  m->type = MUTT_MAILDIR;
-  m->verbose = true;
   maildir_delayed_parsing(m, &mda, &progress);
   maildir_move_to_mailbox(m, &mda);
-
-  account_mailbox_add(a, m);
-
-  // dump_graphviz("index");
-  // for (int i = 0; i < m->email_max; i++)
-  //   dump_graphviz_email(m->emails[i], i);
-
-  // mailbox_free(&m);
   maildirarray_clear(&mda);
   mutt_buffer_pool_release(&buf);
+}
+
+int main(int argc, char *argv[])
+{
+  if (argc < 2)
+    return 1;
+
+  MuttLogger = log_disp_terminal;
+
+  C_HeaderCache = "/home/mutt/.cache/mutt/";
+  C_HeaderCacheBackend = "lmdb";
+  C_Charset = "utf-8";
+
+  struct ConfigSet *cs = cs_new(1024);
+  NeoMutt = neomutt_new(cs);
+  struct Account *a = account_new(NULL, NeoMutt->sub);
+  neomutt_account_add(NeoMutt, a);
+
+  printf(DIVIDER);
+  for (; argc > 1; argc--, argv++)
+  {
+    const char *dir = argv[1];
+
+    struct Mailbox *m = mailbox_new();
+    mutt_buffer_strcpy(&m->pathbuf, dir);
+    m->realpath = mutt_buffer_strdup(&m->pathbuf);
+    m->type = MUTT_MAILDIR;
+    m->verbose = true;
+    notify_observer_add(m->notify, NT_MAILBOX, mbox_observer, NULL);
+
+    account_mailbox_add(a, m);
+    my_mbox_open(m);
+
+    for (int i = 0; i < m->email_max; i++)
+      dump_graphviz_email(m->emails[i], i);
+    printf(DIVIDER);
+  }
+
+  dump_graphviz("index");
   neomutt_free(&NeoMutt);
   cs_free(&cs);
 
-#if 0
-  int rc = maildir_read_dir(m, "cur");
-  printf("old rc = %d\n", rc);
-  rc = maildir_read_dir(m, "new");
-  printf("new rc = %d\n", rc);
-#endif
-
-#if 0
-  int rc = maildir_mbox_open(m);
-  printf("maildir_mbox_open rc = %d\n", rc);
-
-  for (int i = 0; i < m->email_max; i++)
-  {
-    struct Email *e = m->emails[i];
-    struct MaildirEmailData *edata = maildir_edata_get(e);
-    if (!e || !edata)
-      continue;
-    printf("%s\t%s\n", e->read ? "old" : "new", e->path);
-  }
-#endif
-
-#if 0
-  notify_observer_remove(m->notify, mbox_observer, NULL);
-  mailbox_free(&m);
-#endif
   return 0;
 }
