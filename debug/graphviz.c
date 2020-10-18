@@ -49,12 +49,13 @@
 #include "notmuch/private.h"
 #include "pop/private.h"
 
+#define GV_HIDE_CONFIG
 #define GV_HIDE_CONTEXT
 #define GV_HIDE_CONTEXT_CONTENTS
+#define GV_HIDE_EMAILS
 // #define GV_HIDE_MBOX
-#define GV_HIDE_NEOMUTT
-#define GV_HIDE_CONFIG
 // #define GV_HIDE_MDATA
+#define GV_HIDE_NEOMUTT
 
 static void dot_email(FILE *fp, struct Email *e, struct ListHead *links);
 static void dot_envelope(FILE *fp, const struct Envelope *env, struct ListHead *links);
@@ -661,6 +662,19 @@ static void dot_mailbox(FILE *fp, struct Mailbox *m, struct ListHead *links)
   {
     dot_config(fp, m->name, DT_INHERIT_MBOX, m->sub, links);
     dot_add_link(links, m, m->name, "Mailbox Config", false, NULL);
+  }
+#endif
+
+#ifndef GV_HIDE_EMAILS
+  if (m->email_max > 0)
+  {
+    for (int i = 0; i < m->email_max; i++)
+    {
+      if (!m->emails[i])
+        continue;
+      dot_email(fp, m->emails[i], links);
+      dot_add_link(links, m, m->emails[i], "Mailbox->Email", false, NULL);
+    }
   }
 #endif
 }

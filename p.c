@@ -284,7 +284,7 @@ static void my_mbox_open(struct Mailbox *m)
     // printf("    %s\n", e->path);
   }
 
-  maildir_delayed_parsing(m, &mda, &progress);
+  // maildir_delayed_parsing(m, &mda, &progress);
   maildir_move_to_mailbox(m, &mda);
   maildirarray_clear(&mda);
   mutt_buffer_pool_release(&buf);
@@ -321,12 +321,12 @@ int main(int argc, char *argv[])
     account_mailbox_add(a, m);
     my_mbox_open(m);
 
-    for (int i = 0; i < m->email_max; i++)
-      dump_graphviz_email(m->emails[i], i);
+    // for (int i = 0; i < m->email_max; i++)
+    //   dump_graphviz_email(m->emails[i], i);
     printf(DIVIDER);
   }
 
-  dump_graphviz("index");
+  // dump_graphviz("index");
   neomutt_free(&NeoMutt);
   cs_free(&cs);
 
