@@ -1,0 +1,23 @@
+mbox_open()
+	mda = list_emails()
+		read_dir(cur) SIGINT
+			filename
+			realpath
+			flags
+			canon
+		read_dir(new) SIGINT
+	hcache_read(mda) SIGINT
+		C_HeaderCache
+		C_HeaderCacheBackend
+	maildir_populate(mda, C_MaildirHeaderCacheVerify) SIGINT
+	hcache_write(mda) SIGINT
+	apply_rules()
+		C_FlagSafe (frontend)
+	notify(populate)
+
+mbox_check_stats()
+
+mbox_sync()
+
+mbox_check()
+
